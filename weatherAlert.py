@@ -65,6 +65,9 @@ from requests.auth import HTTPDigestAuth
 import json
 import time
 import datetime
+
+import os  
+
          
 class weatheralert(appapi.AppDaemon):
 
@@ -186,9 +189,11 @@ class weatheralert(appapi.AppDaemon):
     # h:mm AM TZZ on month dd, yyyy
 
     strtime=instr[0:instr.find("on")-1]
+    if len(strtime[:strtime.find(":")])==1:
+      strtime="0"+strtime[:len(strtime)-3]
+
     strdate=instr[instr.find("on")+3:]
-    self.log("strtime {} strdate {}".format(strtime,strdate),"DEBUG")
-    tdate=datetime.datetime.strptime(strdate + " " + strtime,"%B %d, %Y %I:%M %p %Z")
-    self.log("tDate {}".format(tdate),"DEBUG")
+    combineTime=strdate+" " + strtime.strip()
+    tdate=datetime.datetime.strptime(combineTime,"%B %d, %Y %I:%M %p")
     return tdate
 
