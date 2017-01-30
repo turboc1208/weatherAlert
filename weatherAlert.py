@@ -65,8 +65,9 @@ from requests.auth import HTTPDigestAuth
 import json
 import time
 import datetime
-import os
-#from homeassistant.util import location    
+
+import os  
+
          
 class weatheralert(appapi.AppDaemon):
 
@@ -74,7 +75,6 @@ class weatheralert(appapi.AppDaemon):
     self.LOGLEVEL="INFO"
     self.alertlog={}
     self.log("Weather Alert App")
-#    self.haConfig=self.loadHAconfig()
     self.key=self.args["key"]
     if "location" in self.args:
       self.loc=eval(self.args["location"])
@@ -94,9 +94,9 @@ class weatheralert(appapi.AppDaemon):
       self.location=self.loc["country"]+"/"+self.loc["city"]
     elif ("city" in self.loc) and ("state" in self.loc):
       self.location=self.loc["state"]+"/"+self.loc["city"]
- #   else:
- #     self.location=str(self.haConfig["latitude"])+","+str(self.haConfig["longitude"])
- #   self.log("haConfig={}".format(self.haConfig))
+    else:
+      self.location=str(self.ha_config["latitude"])+","+str(self.ha_config["longitude"])
+    self.log("ha_config.long={} lat={}".format(self.ha_config["longitude"],self.ha_config["latitude"]))
     if "frequency" in self.args:
       self.freq=int(float(self.args["frequency"]))
     else:
@@ -110,27 +110,6 @@ class weatheralert(appapi.AppDaemon):
     # you might want to use run_minutely for testing and run every (self.freq)  minutes for production.
     #self.run_minutely(self.getAlerts,start=None)
     self.run_every(self.getAlerts,self.datetime(),self.freq*60)
-
-  # overrides appdaemon log file to handle application specific log files
-  # to use this you must set self.LOGLEVEL="DEBUG" or whatever in the initialize function
-  # although technically you could probably set it anywhere in the app if you wanted to
-  # just debug a function, although you probably want to set it back when you get done
-  # in the function or the rest of the program will start spewing messages
-  def log(self,message,level="INFO"):
-    levels = {                                          # these levels were taken from AppDaemon's files which were taken from python's log handler
-              "CRITICAL": 50,
-              "ERROR": 40,
-              "WARNING": 30,
-              "INFO": 20,
-              "DEBUG": 10,
-              "NOTSET": 0
-            }
-
-    if hasattr(self, "LOGLEVEL"):                        # if the LOGLEVEL attribute has been set then deal with whether to print or not.
-      if levels[level]>=levels[self.LOGLEVEL]:           # if the passed in level is >= to the desired LOGLevel the print it.
-        super().log("{} - {}".format(level,message))
-    else:                                                # the LOGLEVEL attribute was not set so just do the log file normally
-      super().log("{}".format(message),level)
 
   ###########################
   def getAlerts(self,kwargs):
@@ -217,26 +196,4 @@ class weatheralert(appapi.AppDaemon):
     combineTime=strdate+" " + strtime.strip()
     tdate=datetime.datetime.strptime(combineTime,"%B %d, %Y %I:%M %p")
     return tdate
-
-  ######################
-  # 
-  #  Load location configuration data from HA
-  #
-  ######################
-  def loadHAconfig(self):
-    haConfig={}
-    locinfo=self.ha.detect_location_info()
-    #locinfo=homeassistant.util.location.detect_location_info()
-    haConfig["IP"]=locinfo.ip
-    haConfig["country_code"]=locinfo.country_code
-    haConfig["country_name"]=locinfo.country_name
-    haConfig["region_code"]=locinfo.region_code
-    haConfig["region_name"]=locinfo.region_name
-    haConfig["city"]=locinfo.city
-    haConfig["zip_code"]=locinfo.zip_code
-    haConfig["time_zone"]=locinfo.time_zone
-    haConfig["latitude"]=locinfo.latitude
-    haConfig["longitude"]=locinfo.longitude
-    haConfig["metric"]=locinfo.use_metric
-    return haConfig
 
