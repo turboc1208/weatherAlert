@@ -96,7 +96,9 @@ class weatheralert(appapi.AppDaemon):
       self.location=self.loc["state"]+"/"+self.loc["city"]
     else:
       self.location=str(self.ha_config["latitude"])+","+str(self.ha_config["longitude"])
-    self.log("ha_config.long={} lat={}".format(self.ha_config["longitude"],self.ha_config["latitude"]))
+
+    self.log("ha_config={}, {}".format(self.ha_config["longitude"],self.ha_config["latitude"]))
+
     if "frequency" in self.args:
       self.freq=int(float(self.args["frequency"]))
     else:
