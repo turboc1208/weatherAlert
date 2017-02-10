@@ -1,7 +1,7 @@
 ###################################################################
 # Weather Alert - Poll for alerts from weatherunderground and alert to HA
 # Written By : Chip Cox  20JAN2017
-#              
+#                 
 #    V0.01.1 21JAN2017 - updated to handle european data
 #    V0.01.2 21JAN2017 - added configuration options 
 #
