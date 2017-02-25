@@ -59,7 +59,7 @@
 # Visit the weatherunderground at the following link for more information about this API
 # https://www.wunderground.com/weather/api/d/docs?d=data/alerts
 ##################################################################################
-import appdaemon.appapi as appapi
+import my_appapi as appapi
 import requests
 from requests.auth import HTTPDigestAuth
 import json
@@ -69,7 +69,7 @@ import datetime
 import os  
 
          
-class weatheralert(appapi.AppDaemon):
+class weatheralert(appapi.my_appapi):
 
   def initialize(self):
     self.LOGLEVEL="INFO"
