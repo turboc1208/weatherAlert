@@ -86,6 +86,11 @@ class weatheralert(appapi.my_appapi):
     else:
       self.title="Weather Alert"
 
+    if "tz" in self.args:
+      self.tz=eval(self.args["tz"])
+    else:
+      self.log("tz element must be configured")
+
     if "zmw" in self.loc:
       self.location=self.loc["zmw"]
     elif "zip" in self.loc:
@@ -196,6 +201,13 @@ class weatheralert(appapi.my_appapi):
 
     strdate=instr[instr.find("on")+3:]
     combineTime=strdate+" " + strtime.strip()
-    tdate=datetime.datetime.strptime(combineTime,"%B %d, %Y %I:%M %p")
+    dtformat="%B %d, %Y %I:%M %p"
+    for tzi in self.tz:
+      if combineTime.find(tzi)>=0:
+        dtformat=dtformat+" %Z"
+        break
+
+    self.log("combineTime={}, {}".format(combineTime,dtformat))
+    tdate=datetime.datetime.strptime(combineTime,dtformat)
     return tdate
 
