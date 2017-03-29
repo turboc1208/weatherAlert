@@ -17,6 +17,7 @@ Installation Instructions
    * location={"city":"your city","state":"your state"}  or {"zmw":"your zmw"}`<br>
    * frequency=minutes between checks   ( Defaults to 15 min )<br>
    * title=title of persistent notification window<br>
+   * dash_dir = /home/pi/appdaemon_dashboard/appdaemon/conf/custom_css/notices/   - directory to where alert pages should be placed
 </ul>
 Notes
 <ul>
@@ -47,7 +48,8 @@ Notes
                                     <t>REC	Record Set<br>
                                     <t>REP	Public Reports<br>
                                     <t>PUB	Public Information Statement<br>
-
+  
+  <li>dash_dir - currently this needs to be placed in a directory under the custom_css directory.
   <li>If you are using the following speach apps in appdaemon
   <ul><li>sound - by Rene Tode - https://community.home-assistant.io/t/let-appdaemon-speak-without-tts-and-mediaplayer-in-hass/8058
   <li>speak - by Chip Cox - https://github.com/turboc1208/AppDaemonApps/blob/master/speak.py

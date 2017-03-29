@@ -4,6 +4,7 @@
 #                 
 #    V0.01.1 21JAN2017 - updated to handle european data
 #    V0.01.2 21JAN2017 - added configuration options 
+#    V0.01.3 29MAR2017 - Added support for AppDaemon HADashboards Beta 3
 #
 ###################################################################
 #
@@ -17,6 +18,7 @@
 #   * location={"city":"your city","state":"your state"}  or {"zmw":"your zmw"}`
 #   * frequency=minutes between checks   ( Defaults to 15 min )
 #   * title=title of persistent notification window
+#   * dash_dir = /home/pi/appdaemon_dashboard/appdaemon/conf/custom_css/notices/   - directory to where alert pages should be placed
 #
 #   * entries are  optional
 #
@@ -46,6 +48,8 @@
 #                                    REC	Record Set
 #                                    REP	Public Reports
 #                                    PUB	Public Information Statement
+#
+#  dash_dir - currently this needs to be in a folder under your custom_css directory.
 #
 #  If you are using the following speach apps in appdaemon
 #  sound - by Rene Tode - https://community.home-assistant.io/t/let-appdaemon-speak-without-tts-and-mediaplayer-in-hass/8058
