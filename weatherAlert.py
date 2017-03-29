@@ -65,9 +65,7 @@ from requests.auth import HTTPDigestAuth
 import json
 import time
 import datetime
-
-import os  
-
+import os
          
 class weatheralert(appapi.my_appapi):
 
@@ -80,6 +78,13 @@ class weatheralert(appapi.my_appapi):
       self.loc=eval(self.args["location"])
     else:
       self.loc={}
+
+    if "dash_dir" in self.args:
+      self.dashdir=self.args["dash_dir"]
+      self.dash_fileout=self.dashdir + "weatherAlert.html"
+    else:
+      self.dashdir=False
+      self.dash_fileout=""
 
     if "title" in self.args:
       self.title=self.args["title"]
@@ -120,6 +125,7 @@ class weatheralert(appapi.my_appapi):
 
   ###########################
   def getAlerts(self,kwargs):
+    self.log("checking for alerts")
     # Get Alert Data
     url = "http://api.wunderground.com/api/{}/alerts/q/{}.json".format(self.key,self.location)
     self.log("url={}".format(url),"DEBUG")
@@ -129,7 +135,8 @@ class weatheralert(appapi.my_appapi):
 
     # For successful API call, response code will be 200 (OK)
     if( not myResponse.ok):
-       myResponse.raise_for_status()
+      self.log("myResponse.status_code={}".format(myResponse.status_code))
+      myResponse.raise_for_status()
     else:
       # Loading the response data into a dict variable
       # json.loads takes in only binary or string variables so using content to fetch binary content
@@ -143,13 +150,22 @@ class weatheralert(appapi.my_appapi):
       self.log("alerts={}".format(jData),"DEBUG")
       if not "alerts" in jData:                                                      # can't do anything without an alerts section
         self.log("For some reason there is no alerts key in the data coming from WeatherUnderground")
+        self.clean_dashfile(self.dashdir,self.dash_fileout)
         return
 
       self.log("The response contains {0} properties".format(len(jData)),"DEBUG")
       if len(jData)==0:                                                              # if there aren't any alerts clean out the alertlog and skip the rest.
+        self.log("No alerts at this time")
         self.alertlog={}
-        self.log("No Alerts at this time","INFO")
+        self.clean_dashfile(self.dashdir,self.dash_fileout)
+
+        self.log("No Alerts at this time")
       else:
+        fileopen=False
+        if not self.dashdir==False:
+          fout=open(self.dash_fileout,"w")
+          fout.write("<html><head><style>body { background-color: #ff0000; } </style></head><body>")
+
         for alert in jData["alerts"]:                                                  # Loop through all the alerts
           alert["key"]=alert["type"]+alert["expires"]                                  # setup a unique reproducable key for each alert 
           self.log("alert[type]={}".format(alert["type"]),"DEBUG")
@@ -162,13 +178,38 @@ class weatheralert(appapi.my_appapi):
                 self.log("this is an alert we are interested in {}".format(alert["type"]),"INFO")
                 if "message" in alert:                                                 # Alert using a persistent notification ( you could add other methods of alerting here too)
                   self.sendAlert(alert["message"])
+                  if not self.dashdir==False:
+                    if not fileopen==False:
+                      fout=open(self.dash_fileout,"w")
+                      fout.write("<html><head><style>body { background-color: #ff0000; } </style></head><body>")
+                      fileopen=True
+                    fout.write(alert["message"])
+                    fout.write("<P>")
                 else:
                   self.sendAlert(alert["level_meteoalarm_description"])
-                  #self.call_service("persistent_notification/create",title="Weather Alert",message=alert["level_meteoalarm_description"])
+                  if not self.dashdir==False:
+                    if not fileopen==False:
+                      fout=open(self.dash_fileout,"w")
+                      fout.write("<html><head><style>body { background-color: #ff0000; } </style></head><body>")
+                      fileopen=True
+                    fout.write(alert["level_meteoalarm_description"])
+                    fout.write("<P>")
             else:                                                                      # we have already notified on this so don't do it again
-              self.log("Alert already in list","DEBUG")
+              self.log("Alert already in list")
           else:                                                                        # there is an alert but we aren't interested in this type
             self.log("we are not interested in alert type {}".format(alert["type"]),"INFO")
+        if fileopen==True:
+          fout.write("</body></html>")
+          fout.close()
+        else:
+          self.clean_dashfile(self.dashdir,self.dash_fileout)
+
+  def clean_dashfile(self,dashdir,fname):
+    if dashdir:
+      if os.path.isfile(self.dash_fileout):
+        self.log("removing {}".format(self.dash_fileout))
+        os.remove(self.dash_fileout)
+  
 
   #######################
   #
