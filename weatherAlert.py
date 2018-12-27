@@ -63,21 +63,23 @@
 # Visit the weatherunderground at the following link for more information about this API
 # https://www.wunderground.com/weather/api/d/docs?d=data/alerts
 ##################################################################################
-import my_appapi as appapi
+import appdaemon.plugins.hass.hassapi as hass
+import datetime
+import time
 import requests
 from requests.auth import HTTPDigestAuth
 import json
-import time
-import datetime
 import os
          
-class weatheralert(appapi.my_appapi):
+class weatheralert(hass.Hass):
 
   def initialize(self):
-    self.LOGLEVEL="INFO"
+    self.LOGLEVEL="DEBUG"
     self.alertlog={}
     self.log("Weather Alert App")
-    self.key=self.args["key"]
+    self.source="NOA"
+    self.mess_history=[]  # history of alerts given with notifications on the ha screen so we don't duplicate them.  Cleared when no alerts are present.
+
     if "location" in self.args:
       self.loc=eval(self.args["location"])
     else:
@@ -109,35 +111,61 @@ class weatheralert(appapi.my_appapi):
     elif ("city" in self.loc) and ("state" in self.loc):
       self.location=self.loc["state"]+"/"+self.loc["city"]
     else:
+      self.ha_config=self.get_plugin_config()
+      self.log("ha_config={}".format(self.ha_config))
       self.location=str(self.ha_config["latitude"])+","+str(self.ha_config["longitude"])
 
-    self.log("ha_config={}, {}".format(self.ha_config["longitude"],self.ha_config["latitude"]))
-
+    self.log("location={}".format(self.location))
     if "frequency" in self.args:
       self.freq=int(float(self.args["frequency"]))
     else:
       self.freq=15
     self.desired_alerts=self.args["alerts"]
 
-    self.log("Location={}".format(self.location))
-    self.log("Key=ImNotTelling")
+    self.log("self.Location={}".format(self.location))
     self.log("Alert Levels={}".format(self.desired_alerts))
     self.log("Setting WeatherAlert to run ever {} minutes or {} seconds".format(self.freq,self.freq*60),"INFO")
     # you might want to use run_minutely for testing and run every (self.freq)  minutes for production.
     #self.run_minutely(self.getAlerts,start=None)
     self.run_every(self.getAlerts,self.datetime(),self.freq*60)
+    self.run_every(self.getWeather,self.datetime(),self.freq*30)
+    self.log("Initialization complete")
+
+  def get_zone_by_lon_lat(self,**kwargs):
+    url = "https://api.weather.gov/zones?type=forecast&point={}".format(self.location)
+    myResponse = requests.get(url)
+    self.log("myResponse.status_code={}".format(myResponse.status_code))
+
+    # For successful API call, response code will be 200 (OK)
+    if( not myResponse.ok):
+      self.log("myResponse.status_code={}".format(myResponse.status_code))
+      myResponse.raise_for_status()
+    else:
+      jData = json.loads(myResponse.content.decode('utf-8'))
+    self.zone=jData["features"][0]["properties"]["id"]
+    self.log("Returning zone = {}".format(self.zone))
+    return(self.zone)
+
+  def getWeather(self,kwargs):
+    self.log("Checking Weather")
+    rain_states=["rainy","snowy","snowy-rainy","hail","lightning"]
+    if self.get_state("weather.dark_sky") in rain_states:
+      self.set_state("sensor.raining",state="on")
+    else:
+      self.set_state("sensor.raining",state="off")
 
   ###########################
   def getAlerts(self,kwargs):
     self.log("checking for alerts")
     # Get Alert Data
-    url = "http://api.wunderground.com/api/{}/alerts/q/{}.json".format(self.key,self.location)
-    self.log("url={}".format(url),"DEBUG")
+    zone=self.get_zone_by_lon_lat()
+    alert={}
+    url="https://api.weather.gov/alerts/active/zone/{}".format(zone)
 
     myResponse = requests.get(url)
-    self.log("myResponse.status_code={}".format(myResponse.status_code),"DEBUG")
+    self.log("myResponse.status_code={}".format(myResponse.status_code))
 
-    # For successful API call, response code will be 200 (OK)
+# For successful API call, response code will be 200 (OK)
     if( not myResponse.ok):
       self.log("myResponse.status_code={}".format(myResponse.status_code))
       myResponse.raise_for_status()
@@ -146,33 +174,28 @@ class weatheralert(appapi.my_appapi):
       # json.loads takes in only binary or string variables so using content to fetch binary content
       # Loads (Load String) takes a Json file and converts into python data structure (dict or list, depending on JSON)
       jData = json.loads(myResponse.content.decode('utf-8'))
-      if self.LOGLEVEL=="DEBUG":
-        filename=self.config["AppDaemon"]["app_dir"] + "/" + "samplealert.json"
-        with open(filename) as json_data:
-          jData=json.load(json_data)         
 
-      self.log("alerts={}".format(jData),"DEBUG")
-      if not "alerts" in jData:                                                      # can't do anything without an alerts section
-        self.log("For some reason there is no alerts key in the data coming from WeatherUnderground")
-        self.clean_dashfile(self.dashdir,self.dash_fileout)
-        return
-
-      self.log("The response contains {0} properties".format(len(jData)),"DEBUG")
-      if len(jData)==0:                                                              # if there aren't any alerts clean out the alertlog and skip the rest.
+      self.log("The response contains {0} properties".format(len(jData["features"])))
+      if len(jData["features"])==0:                                                              # if there aren't any alerts clean out the alertlog and skip the rest.
         self.log("No alerts at this time")
-        self.alertlog={}
-        self.clean_dashfile(self.dashdir,self.dash_fileout)
-
-        self.log("No Alerts at this time")
+        self.mess_history=[]
       else:
-        fileopen=False
-        if not self.dashdir==False:
-          fout=open(self.dash_fileout,"w")
-          fout.write("<html><head><style>body { background-color: #ff0000; } </style></head><body>")
+        for a in jData["features"]:
+          alert[a["properties"]["id"]]={"messageType":a["properties"]["messageType"],
+                  "event":a["properties"]["event"],
+                  "expires":a["properties"]["expires"],
+                  "headline":a["properties"]["headline"],
+                  "displayed":"N"}
+        mess=""
+        for a in alert:
+          mess=mess+alert[a]["headline"] 
+        self.log("mess={}".format(mess))
+        self.sendAlert(alert)
 
-        for alert in jData["alerts"]:                                                  # Loop through all the alerts
-          alert["key"]=alert["type"]+alert["expires"]                                  # setup a unique reproducable key for each alert 
-          self.log("alert[type]={}".format(alert["type"]),"DEBUG")
+  def bogus_stuff(self,**kwargs):
+        for alert in jData["features"]:                                                  # Loop through all the alerts
+          alert["id"]=alert["event"]+alert["expires"]                                  # setup a unique reproducable key for each alert 
+          self.log("alert[type]={}".format(alert["type"]))
           if alert["type"] in self.desired_alerts:                                     # is this an alert type we are interested in
             if not alert["key"] in self.alertlog:                                      # if the key is in the alertlog we have already alerted on it
               if self.timefromstring(alert["expires"])<datetime.datetime.now():        # has this alert expired?
@@ -220,18 +243,23 @@ class weatheralert(appapi.my_appapi):
   # send the proximity alert and send it to speak if it's installed
   #
   #######################
-  def sendAlert(self,msg):
-    self.call_service("persistent_notification/create",title=self.title,message=msg)   # send persistent_notification 
+  def sendAlert(self,alert):
+    title=alert[list(alert)[0]]["event"]
+    message=alert[list(alert)[0]]["headline"]
+    if not message in self.mess_history:
+      self.mess_history.append(message)
+      self.call_service("persistent_notification/create",title=title,message=message)   # send persistent_notification 
     if not  self.get_app("speak")==None:                                                    # check if speak is running in AppDaemon
       self.log("Speak is installed")
       priority=1
-      self.fire_event("SPEAK_EVENT",text=msg,priority=priority,language="en")               # Speak is installed so call it
+      self.fire_event("SPEAK_EVENT",text=message,media_player="all",priority=priority,language="en")               # Speak is installed so call it
     elif not self.get_app("soundfunctions")==None:
       self.log("Soundfunctions is installed")
       sound = self.get_app("soundfunctions")                                                 
       sound.say("Any text you like","your_language","your_priority")    
     else:
       self.log("No supported speack apps are installed")                                                    # Speak is not installed
+
 
   #######################
   # Had some problems getting weather undergrounds date format to behave so I had to parse it out myself
